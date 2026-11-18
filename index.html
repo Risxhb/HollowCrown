@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#100e16">
+  <meta name="description" content="Play the Register Archives, District 2 of The Hollow Crown, in your browser.">
+  <title>Register Archives · The Hollow Crown</title>
+  <link rel="icon" href="regent.png">
+  <link rel="stylesheet" href="archive.css">
+  
+</head>
+<body>
+  <header class="masthead">
+    <div class="wrap masthead-inner">
+      <a class="wordmark" href="./">The Hollow Crown</a>
+      <a class="controls-link" href="#controls">Controls</a>
+    </div>
+  </header>
+  <main class="wrap">
+    <section class="intro" aria-labelledby="title">
+      <div>
+        <p class="eyebrow">District II · Solo browser demo</p>
+        <h1 id="title">Register Archives</h1>
+      </div>
+      <p class="intro-copy">Fight through the Index Hall and Sealed Stacks, then face the Nameless Regent.</p>
+    </section>
+    <section class="game" aria-label="Playable demo">
+      <div id="game-frame" class="game-frame">
+        <canvas id="canvas" tabindex="0" width="1280" height="720" aria-label="The Hollow Crown game" hidden></canvas>
+        <div id="cover" class="cover">
+          <button id="play" class="play" type="button" disabled>Play District 2</button>
+          <p id="status" role="status">Preparing the game launcher…</p>
+          <progress id="progress" aria-label="Game download progress" hidden></progress>
+          <noscript>Enable JavaScript to play.</noscript>
+        </div>
+      </div>
+      <div class="game-meta">
+        <p>Keyboard and mouse recommended</p>
+        <button id="fullscreen" type="button" hidden>Fullscreen</button>
+      </div>
+    </section>
+    <section class="controls" id="controls" aria-labelledby="controls-title">
+      <h2 id="controls-title">Controls</h2>
+      <dl>
+        <div><dt>Move</dt><dd><kbd>W A S D</kbd></dd></div>
+        <div><dt>Aim and attack</dt><dd><kbd>Mouse</kbd> <kbd>Left click</kbd></dd></div>
+        <div><dt>Dodge</dt><dd><kbd>Space</kbd></dd></div>
+        <div><dt>Class ability</dt><dd><kbd>C</kbd></dd></div>
+        <div><dt>Swap weapon</dt><dd><kbd>Q</kbd></dd></div>
+        <div><dt>Shatter</dt><dd><kbd>F</kbd></dd></div>
+        <div><dt>Use exit</dt><dd><kbd>E</kbd></dd></div>
+        <div><dt>Restart</dt><dd><kbd>R</kbd></dd></div>
+      </dl>
+    </section>
+  </main>
+  <footer class="wrap">
+    <a href="godot-copyright.txt">Godot and third-party licenses</a>
+  </footer>
+  <script src="index.js"></script>
+  <script>
+    const config = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":605564,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+    const canvas = document.getElementById('canvas');
+    const frame = document.getElementById('game-frame');
+    const cover = document.getElementById('cover');
+    const play = document.getElementById('play');
+    const status = document.getElementById('status');
+    const progress = document.getElementById('progress');
+    const fullscreen = document.getElementById('fullscreen');
+
+    if (typeof Engine === 'undefined') {
+      status.textContent = 'The game launcher could not load. Reload the page to try again.';
+    } else if (Engine.getMissingFeatures({ threads: false }).length) {
+      status.textContent = 'This demo requires a browser with WebGL 2 and WebAssembly.';
+    } else {
+      play.disabled = false;
+      const size = Object.values(config.fileSizes).reduce((total, bytes) => total + bytes, 0);
+      status.textContent = `About ${Math.round(size / 1_000_000)} MB to load`;
+    }
+
+    play.addEventListener('click', async () => {
+      play.disabled = true;
+      play.textContent = 'Loading…';
+      status.textContent = 'Downloading the demo…';
+      progress.hidden = false;
+      canvas.hidden = false;
+      const engine = new Engine(config);
+
+      try {
+        await engine.startGame({
+          canvas,
+          onProgress(current, total) {
+            if (total > 0) {
+              progress.max = total;
+              progress.value = current;
+            }
+            if (total > 0 && current >= total) status.textContent = 'Starting the game…';
+          },
+        });
+        cover.hidden = true;
+        fullscreen.hidden = !frame.requestFullscreen;
+        canvas.focus();
+      } catch (error) {
+        console.error(error);
+        canvas.hidden = true;
+        progress.hidden = true;
+        play.hidden = true;
+        status.textContent = 'The game could not start. Reload the page to try again.';
+      }
+    });
+
+    fullscreen.addEventListener('click', async () => {
+      try {
+        await frame.requestFullscreen();
+      } catch (error) {
+        console.warn('Fullscreen is unavailable.', error);
+      }
+      canvas.focus();
+    });
+    document.addEventListener('fullscreenchange', () => canvas.focus());
+  </script>
+</body>
+</html>
+
