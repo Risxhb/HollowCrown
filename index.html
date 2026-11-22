@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#100e16">
-  <meta name="description" content="Play the Register Archives, District 2 of The Hollow Crown, in your browser.">
-  <title>Register Archives · The Hollow Crown</title>
+  <meta name="description" content="Play floor 4 of District 2, the Intake, in your browser.">
+  <title>The Intake · The Hollow Crown</title>
   <link rel="icon" href="regent.png">
   <link rel="stylesheet" href="archive.css">
   
@@ -21,15 +21,15 @@
     <section class="intro" aria-labelledby="title">
       <div>
         <p class="eyebrow">District II · Solo browser demo</p>
-        <h1 id="title">Register Archives</h1>
+        <h1 id="title">Floor 4 · The Intake</h1>
       </div>
-      <p class="intro-copy">Fight through the Index Hall and Sealed Stacks, then face the Nameless Regent.</p>
+      <p class="intro-copy">A generated floor of the Register Archives: a new layout each run. Clear the rooms and take the stairs down.</p>
     </section>
     <section class="game" aria-label="Playable demo">
       <div id="game-frame" class="game-frame">
         <canvas id="canvas" tabindex="0" width="1280" height="720" aria-label="The Hollow Crown game" hidden></canvas>
         <div id="cover" class="cover">
-          <button id="play" class="play" type="button" disabled>Play District 2</button>
+          <button id="play" class="play" type="button" disabled>Play floor 4</button>
           <p id="status" role="status">Preparing the game launcher…</p>
           <progress id="progress" aria-label="Game download progress" hidden></progress>
           <noscript>Enable JavaScript to play.</noscript>
@@ -59,7 +59,8 @@
   </footer>
   <script src="index.js"></script>
   <script>
-    const config = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":605564,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+    const config = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":1916632,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+    config.args = ['--', '--solo', '--district=2', '--new-art', '--class=sworn'];
     const canvas = document.getElementById('canvas');
     const frame = document.getElementById('game-frame');
     const cover = document.getElementById('cover');
