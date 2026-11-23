@@ -33,7 +33,7 @@
   </div>
   <script src="index.js"></script>
   <script>
-    const config = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":1918312,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+    const config = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":1922472,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
     config.args = ['--', '--solo', '--district=2', '--new-art', '--class=sworn', '--hd-quality=web', ...new URLSearchParams(location.search).getAll('arg')];
     const canvas = document.getElementById('canvas');
     const cover = document.getElementById('cover');
@@ -47,18 +47,35 @@
       status.textContent = 'This game needs a browser with WebGL 2 and WebAssembly.';
       progress.hidden = true;
     } else {
+      // The game says how its own load is going (HdStage: it builds the floor a part at a time, then prepares
+      // the lighting one view a frame) and when it is ready; the cover stays up until then.
+      let heard = false;
+      const show = () => { cover.hidden = true; canvas.focus(); };
+      window.hcLoading = (label, done, total) => {
+        heard = true;
+        progress.max = Math.max(total, 1);
+        progress.value = done;
+        status.textContent = total > 1 ? `${label}… ${done} of ${total}` : `${label}…`;
+      };
+      window.hcReady = show;
       const engine = new Engine(config);
       engine.startGame({
         onProgress(current, total) {
           if (total > 0) {
             progress.max = total;
             progress.value = current;
-            status.textContent = current >= total ? 'Starting… The first start can take a minute or two while your browser prepares the lighting.' : `Loading… ${Math.round(current / 1e6)} of ${Math.round(total / 1e6)} MB`;
+            status.textContent = current >= total ? 'Starting…' : `Loading… ${Math.round(current / 1e6)} of ${Math.round(total / 1e6)} MB`;
           }
         },
       }).then(() => {
-        cover.hidden = true;
-        canvas.focus();
+        // The game may already be reporting its own progress by now; don't write over it.
+        if (!heard) {
+          status.textContent = 'Starting…';
+          progress.removeAttribute('value');
+        }
+        // A build that never reports (no HD scenery) is shown after a while anyway, and so is a load that stalls.
+        setTimeout(() => { if (!heard) show(); }, 30000);
+        setTimeout(show, 600000);
       }).catch((error) => {
         console.error(error);
         progress.hidden = true;
