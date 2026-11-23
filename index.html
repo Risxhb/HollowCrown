@@ -3,122 +3,69 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#100e16">
-  <meta name="description" content="Play floor 4 of District 2, the Intake, in your browser.">
-  <title>The Intake · The Hollow Crown</title>
+  <meta name="theme-color" content="#000000">
+  <meta name="description" content="The Hollow Crown: District 2, floor 4, the Intake. Playable in your browser.">
+  <title>The Hollow Crown · Floor 4</title>
   <link rel="icon" href="regent.png">
-  <link rel="stylesheet" href="archive.css">
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+    #canvas { display: block; width: 100vw; height: 100vh; outline: none; image-rendering: pixelated; }
+    #cover {
+      position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 14px; background: #000; color: #d8d2c4; font: 15px/1.4 system-ui, sans-serif; text-align: center; padding: 16px;
+    }
+    #cover[hidden] { display: none; }
+    #cover h1 { margin: 0; font: 600 22px/1.2 Georgia, serif; color: #f1e7cf; letter-spacing: .02em; }
+    #progress { width: min(320px, 80vw); height: 6px; appearance: none; border: 0; background: #222; }
+    #progress::-webkit-progress-bar { background: #222; }
+    #progress::-webkit-progress-value { background: #d8a34a; }
+    #progress::-moz-progress-bar { background: #d8a34a; }
+  </style>
   
 </head>
 <body>
-  <header class="masthead">
-    <div class="wrap masthead-inner">
-      <a class="wordmark" href="./">The Hollow Crown</a>
-      <a class="controls-link" href="#controls">Controls</a>
-    </div>
-  </header>
-  <main class="wrap">
-    <section class="intro" aria-labelledby="title">
-      <div>
-        <p class="eyebrow">District II · Solo browser demo</p>
-        <h1 id="title">Floor 4 · The Intake</h1>
-      </div>
-      <p class="intro-copy">A generated floor of the Register Archives: a new layout each run. Clear the rooms and take the stairs down.</p>
-    </section>
-    <section class="game" aria-label="Playable demo">
-      <div id="game-frame" class="game-frame">
-        <canvas id="canvas" tabindex="0" width="1280" height="720" aria-label="The Hollow Crown game" hidden></canvas>
-        <div id="cover" class="cover">
-          <button id="play" class="play" type="button" disabled>Play floor 4</button>
-          <p id="status" role="status">Preparing the game launcher…</p>
-          <progress id="progress" aria-label="Game download progress" hidden></progress>
-          <noscript>Enable JavaScript to play.</noscript>
-        </div>
-      </div>
-      <div class="game-meta">
-        <p>Keyboard and mouse recommended</p>
-        <button id="fullscreen" type="button" hidden>Fullscreen</button>
-      </div>
-    </section>
-    <section class="controls" id="controls" aria-labelledby="controls-title">
-      <h2 id="controls-title">Controls</h2>
-      <dl>
-        <div><dt>Move</dt><dd><kbd>W A S D</kbd></dd></div>
-        <div><dt>Aim and attack</dt><dd><kbd>Mouse</kbd> <kbd>Left click</kbd></dd></div>
-        <div><dt>Dodge</dt><dd><kbd>Space</kbd></dd></div>
-        <div><dt>Class ability</dt><dd><kbd>C</kbd></dd></div>
-        <div><dt>Swap weapon</dt><dd><kbd>Q</kbd></dd></div>
-        <div><dt>Shatter</dt><dd><kbd>F</kbd></dd></div>
-        <div><dt>Use exit</dt><dd><kbd>E</kbd></dd></div>
-        <div><dt>Restart</dt><dd><kbd>R</kbd></dd></div>
-      </dl>
-    </section>
-  </main>
-  <footer class="wrap">
-    <a href="godot-copyright.txt">Godot and third-party licenses</a>
-  </footer>
+  <canvas id="canvas" tabindex="0">Your browser can't show the game.</canvas>
+  <div id="cover">
+    <h1>The Hollow Crown · Floor 4</h1>
+    <progress id="progress" aria-label="Download progress"></progress>
+    <p id="status" role="status">Loading…</p>
+    <noscript>Enable JavaScript to play.</noscript>
+  </div>
   <script src="index.js"></script>
   <script>
-    const config = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":1916632,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
-    config.args = ['--', '--solo', '--district=2', '--new-art', '--class=sworn'];
+    const config = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":1918312,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+    config.args = ['--', '--solo', '--district=2', '--new-art', '--class=sworn', '--hd-quality=web', ...new URLSearchParams(location.search).getAll('arg')];
     const canvas = document.getElementById('canvas');
-    const frame = document.getElementById('game-frame');
     const cover = document.getElementById('cover');
-    const play = document.getElementById('play');
     const status = document.getElementById('status');
     const progress = document.getElementById('progress');
-    const fullscreen = document.getElementById('fullscreen');
 
     if (typeof Engine === 'undefined') {
-      status.textContent = 'The game launcher could not load. Reload the page to try again.';
+      status.textContent = 'The game could not load. Reload the page to try again.';
+      progress.hidden = true;
     } else if (Engine.getMissingFeatures({ threads: false }).length) {
-      status.textContent = 'This demo requires a browser with WebGL 2 and WebAssembly.';
+      status.textContent = 'This game needs a browser with WebGL 2 and WebAssembly.';
+      progress.hidden = true;
     } else {
-      play.disabled = false;
-      const size = Object.values(config.fileSizes).reduce((total, bytes) => total + bytes, 0);
-      status.textContent = `About ${Math.round(size / 1_000_000)} MB to load`;
-    }
-
-    play.addEventListener('click', async () => {
-      play.disabled = true;
-      play.textContent = 'Loading…';
-      status.textContent = 'Downloading the demo…';
-      progress.hidden = false;
-      canvas.hidden = false;
       const engine = new Engine(config);
-
-      try {
-        await engine.startGame({
-          canvas,
-          onProgress(current, total) {
-            if (total > 0) {
-              progress.max = total;
-              progress.value = current;
-            }
-            if (total > 0 && current >= total) status.textContent = 'Starting the game…';
-          },
-        });
+      engine.startGame({
+        onProgress(current, total) {
+          if (total > 0) {
+            progress.max = total;
+            progress.value = current;
+            status.textContent = current >= total ? 'Starting… The first start can take a minute or two while your browser prepares the lighting.' : `Loading… ${Math.round(current / 1e6)} of ${Math.round(total / 1e6)} MB`;
+          }
+        },
+      }).then(() => {
         cover.hidden = true;
-        fullscreen.hidden = !frame.requestFullscreen;
         canvas.focus();
-      } catch (error) {
+      }).catch((error) => {
         console.error(error);
-        canvas.hidden = true;
         progress.hidden = true;
-        play.hidden = true;
         status.textContent = 'The game could not start. Reload the page to try again.';
-      }
-    });
-
-    fullscreen.addEventListener('click', async () => {
-      try {
-        await frame.requestFullscreen();
-      } catch (error) {
-        console.warn('Fullscreen is unavailable.', error);
-      }
-      canvas.focus();
-    });
-    document.addEventListener('fullscreenchange', () => canvas.focus());
+      });
+    }
+    canvas.addEventListener('pointerdown', () => canvas.focus());
   </script>
 </body>
 </html>
