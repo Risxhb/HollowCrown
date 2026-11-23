@@ -27,18 +27,20 @@
   <canvas id="canvas" tabindex="0">Your browser can't show the game.</canvas>
   <div id="cover">
     <h1>The Hollow Crown · Floor 4</h1>
+    <p id="ended" hidden>That's the end of the demo. Thanks for playing!<br>A new floor 4 is on its way.</p>
     <progress id="progress" aria-label="Download progress"></progress>
     <p id="status" role="status">Loading…</p>
     <noscript>Enable JavaScript to play.</noscript>
   </div>
   <script src="index.js"></script>
   <script>
-    const config = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":1922472,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
-    config.args = ['--', '--solo', '--district=2', '--new-art', '--class=sworn', '--hd-quality=web', ...new URLSearchParams(location.search).getAll('arg')];
+    const config = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":1924056,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+    config.args = ['--', '--solo', '--district=2', '--new-art', '--class=sworn', '--hd-quality=web', '--demo-floor4', ...new URLSearchParams(location.search).getAll('arg')];
     const canvas = document.getElementById('canvas');
     const cover = document.getElementById('cover');
     const status = document.getElementById('status');
     const progress = document.getElementById('progress');
+    const ended = document.getElementById('ended');
 
     if (typeof Engine === 'undefined') {
       status.textContent = 'The game could not load. Reload the page to try again.';
@@ -50,7 +52,9 @@
       // The game says how its own load is going (HdStage: it builds the floor a part at a time, then prepares
       // the lighting one view a frame) and when it is ready; the cover stays up until then.
       let heard = false;
-      const show = () => { cover.hidden = true; canvas.focus(); };
+      const show = () => { cover.hidden = true; ended.hidden = true; canvas.focus(); };
+      // The demo is floor 4 only: its exit brings the cover back with a thank-you, and a new floor 4 loads under it.
+      window.hcDemoEnd = () => { ended.hidden = false; cover.hidden = false; status.textContent = ''; progress.removeAttribute('value'); };
       window.hcLoading = (label, done, total) => {
         heard = true;
         progress.max = Math.max(total, 1);
