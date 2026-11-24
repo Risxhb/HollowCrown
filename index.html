@@ -27,20 +27,88 @@
   <canvas id="canvas" tabindex="0">Your browser can't show the game.</canvas>
   <div id="cover">
     <h1>The Hollow Crown · Floor 4</h1>
-    <p id="ended" hidden>That's the end of the demo. Thanks for playing!<br>A new floor 4 is on its way.</p>
-    <progress id="progress" aria-label="Download progress"></progress>
+    <p id="ended" hidden>That's the end of the demo. Thanks for playing!<br>Floor 4 starts again.</p>
+    <progress id="progress" aria-label="Loading progress"></progress>
     <p id="status" role="status">Loading…</p>
     <noscript>Enable JavaScript to play.</noscript>
   </div>
   <script src="index.js"></script>
   <script>
+    // The demo is one fixed floor 4 (seed 1), so it always needs the same lighting shaders.
+    const SEED = 1;
     const config = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":2024676,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
-    config.args = ['--', '--solo', '--district=2', '--new-art', '--class=sworn', '--hd-quality=web', '--demo-floor4', ...new URLSearchParams(location.search).getAll('arg')];
+    config.args = ['--', '--solo', '--district=2', '--new-art', '--class=sworn', '--hd-quality=web', '--demo-floor4', `--seed=${SEED}`, ...new URLSearchParams(location.search).getAll('arg')];
     const canvas = document.getElementById('canvas');
     const cover = document.getElementById('cover');
     const status = document.getElementById('status');
     const progress = document.getElementById('progress');
     const ended = document.getElementById('ended');
+
+    // The shader pack (shaders.json): the exact lighting shaders this floor needs, captured from the game
+    // (make-pack.mjs). On a first visit a browser takes 20-40 s to build each big one, and the game builds them
+    // one at a time (about 3.5 minutes on Chrome for Windows). The page hands the browser all of them at once,
+    // so it builds them side by side on several cores (about a minute); when the game asks for them they are
+    // already built. Same shaders, so the same look. A browser without parallel building, or a page without
+    // the pack, loads as it always did.
+    const load = { mb: 0, mbTotal: 0, shaders: 0, shadersTotal: 0 };
+    // Once the game reports its own progress (hcLoading), the page stops writing over it.
+    let heard = false;
+    const tell = () => {
+      if (heard) return;
+      if (load.shadersTotal) {
+        progress.max = load.shadersTotal; progress.value = load.shaders;
+        status.textContent = `Preparing the lighting… ${load.shaders} of ${load.shadersTotal}`;
+      } else if (load.mbTotal) {
+        progress.max = load.mbTotal; progress.value = load.mb;
+        status.textContent = `Loading… ${Math.round(load.mb / 1e6)} of ${Math.round(load.mbTotal / 1e6)} MB`;
+      }
+    };
+    // The browser only reuses a built shader for a context with the same extensions switched on, so the
+    // page switches on the ones the game's context does (Godot 4.7.2's web build, recorded 2026-11-24).
+    const GAME_EXTENSIONS = ['WEBGL_multi_draw', 'EXT_polygon_offset_clamp', 'EXT_clip_control', 'WEBGL_polygon_mode',
+      'ANGLE_instanced_arrays', 'OES_vertex_array_object', 'WEBGL_draw_buffers', 'WEBGL_draw_instanced_base_vertex_base_instance',
+      'WEBGL_multi_draw_instanced_base_vertex_base_instance', 'EXT_disjoint_timer_query_webgl2', 'EXT_color_buffer_float',
+      'EXT_color_buffer_half_float', 'EXT_conservative_depth', 'EXT_depth_clamp', 'EXT_float_blend', 'EXT_texture_compression_bptc',
+      'EXT_texture_compression_rgtc', 'EXT_texture_filter_anisotropic', 'EXT_texture_norm16', 'KHR_parallel_shader_compile',
+      'NV_shader_noperspective_interpolation', 'OES_texture_float_linear', 'WEBGL_blend_func_extended', 'WEBGL_clip_cull_distance',
+      'WEBGL_compressed_texture_s3tc', 'WEBGL_compressed_texture_s3tc_srgb', 'OVR_multiview2'];
+    async function warmShaders(url) {
+      const gl = document.createElement('canvas').getContext('webgl2', { alpha: false, depth: true, stencil: false, antialias: false,
+        premultipliedAlpha: true, preserveDrawingBuffer: true, powerPreference: 'default' });
+      if (gl) for (const name of GAME_EXTENSIONS) gl.getExtension(name);
+      const ext = gl && gl.getExtension('KHR_parallel_shader_compile');
+      if (!ext) return 'no parallel shader building';
+      let pack;
+      try { pack = await (await fetch(url)).json(); } catch { return 'no shader pack'; }
+      // Each distinct line is stored once; a shader is a list of line numbers (make-pack.mjs).
+      if (pack.format === 'lines-1') pack.sources = pack.sources.map((s) => s.map((n) => pack.lines[n]).join('\n'));
+      const programs = pack.programs.map((p) => {
+        const program = gl.createProgram();
+        for (const [type, index] of [[gl.VERTEX_SHADER, p.vs], [gl.FRAGMENT_SHADER, p.fs]]) {
+          const shader = gl.createShader(type);
+          gl.shaderSource(shader, pack.sources[index]);
+          gl.compileShader(shader);
+          gl.attachShader(program, shader);
+        }
+        for (const [location, name] of p.attribs || []) gl.bindAttribLocation(program, location, name);
+        if (p.tf) gl.transformFeedbackVaryings(program, p.tf.varyings, p.tf.mode);
+        gl.linkProgram(program);
+        return program;
+      });
+      load.shadersTotal = programs.length;
+      // Wait for each in turn while the rest keep building. Asking whether a shader linked while it is still
+      // building is what files it in the browser's saved shader cache (asking only once it was done, or
+      // polling COMPLETION_STATUS, left it out), so a later visit loads it from disk in moments.
+      // The page holds still while it waits.
+      for (const program of programs) {
+        await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+        gl.getProgramParameter(program, gl.LINK_STATUS);
+        load.shaders += 1;
+        tell();
+      }
+      window.hcShaderContext = gl;
+      return `${programs.length} shaders ready`;
+    }
 
     if (typeof Engine === 'undefined') {
       status.textContent = 'The game could not load. Reload the page to try again.';
@@ -51,9 +119,8 @@
     } else {
       // The game says how its own load is going (HdStage: it builds the floor a part at a time, then prepares
       // the lighting one view a frame) and when it is ready; the cover stays up until then.
-      let heard = false;
       const show = () => { cover.hidden = true; ended.hidden = true; canvas.focus(); };
-      // The demo is floor 4 only: its exit brings the cover back with a thank-you, and a new floor 4 loads under it.
+      // The demo is floor 4 only: its exit brings the cover back with a thank-you, and floor 4 starts again under it.
       window.hcDemoEnd = () => { ended.hidden = false; cover.hidden = false; status.textContent = ''; progress.removeAttribute('value'); };
       window.hcLoading = (label, done, total) => {
         heard = true;
@@ -62,15 +129,26 @@
         status.textContent = total > 1 ? `${label}… ${done} of ${total}` : `${label}…`;
       };
       window.hcReady = show;
-      const engine = new Engine(config);
-      engine.startGame({
+      const t0 = performance.now();
+      const warm = warmShaders(`shaders.json?seed=${SEED}`).then((result) => {
+        console.log(`shader pack: ${result} after ${Math.round(performance.now() - t0)} ms`);
+      });
+      // What engine.startGame() does, with the shader building added alongside.
+      const exe = config.executable;
+      const pack = config.mainPack || `${exe}.pck`;
+      config.args = ['--main-pack', pack].concat(config.args);
+      const engine = new Engine({
+        ...config,
         onProgress(current, total) {
-          if (total > 0) {
-            progress.max = total;
-            progress.value = current;
-            status.textContent = current >= total ? 'Starting…' : `Loading… ${Math.round(current / 1e6)} of ${Math.round(total / 1e6)} MB`;
-          }
+          if (total > 0) { load.mb = current; load.mbTotal = total; tell(); }
         },
+      });
+      // The download and the shader building run side by side; the game starts when both are done, so its
+      // own lighting step finds every shader built.
+      Promise.all([engine.init(exe), engine.preloadFile(pack, pack), warm]).then(() => {
+        status.textContent = 'Starting…';
+        progress.removeAttribute('value');
+        return engine.start();
       }).then(() => {
         // The game may already be reporting its own progress by now; don't write over it.
         if (!heard) {
