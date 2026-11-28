@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#000000">
-  <meta name="description" content="The Hollow Crown: District 2, floor 4, the Intake. Playable in your browser.">
-  <title>The Hollow Crown · Floor 4</title>
+  <meta name="description" content="The Hollow Crown: the Nameless Regent, District 2's floor 6 guardian. Playable in your browser.">
+  <title>The Hollow Crown · The Nameless Regent</title>
   <link rel="icon" href="regent.png">
   <style>
     html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
@@ -14,8 +14,18 @@
       position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
       gap: 14px; background: #000; color: #d8d2c4; font: 15px/1.4 system-ui, sans-serif; text-align: center; padding: 16px;
     }
-    #cover[hidden] { display: none; }
+    #cover[hidden], [hidden] { display: none !important; }
     #cover h1 { margin: 0; font: 600 22px/1.2 Georgia, serif; color: #f1e7cf; letter-spacing: .02em; }
+    #cover p { margin: 0; }
+    #pace { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    #pace .buttons { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+    #pace button {
+      min-width: 150px; padding: 10px 18px; font: 600 15px/1.2 system-ui, sans-serif; color: #f1e7cf; cursor: pointer;
+      background: #1a1612; border: 1px solid #6b5a3c; border-radius: 4px;
+    }
+    #pace button:hover, #pace button:focus-visible { border-color: #d8a34a; background: #241d15; outline: none; }
+    #pace button[aria-pressed="true"] { border-color: #d8a34a; background: #3a2c18; }
+    #pace small { display: block; font: 400 12px/1.3 system-ui, sans-serif; color: #b3aa98; margin-top: 3px; }
     #progress { width: min(320px, 80vw); height: 6px; appearance: none; border: 0; background: #222; }
     #progress::-webkit-progress-bar { background: #222; }
     #progress::-webkit-progress-value { background: #d8a34a; }
@@ -26,39 +36,50 @@
 <body>
   <canvas id="canvas" tabindex="0">Your browser can't show the game.</canvas>
   <div id="cover">
-    <h1>The Hollow Crown · Floor 4</h1>
-    <p id="ended" hidden>That's the end of the demo. Thanks for playing!<br>Floor 4 starts again.</p>
+    <h1>The Hollow Crown · The Nameless Regent</h1>
+    <p id="ended" hidden>That's the end of the demo. Thanks for playing!</p>
+    <div id="pace">
+      <p id="pace-ask">Choose a pace for the fight:</p>
+      <div class="buttons">
+        <button type="button" data-pace="normal">Normal pace<small>longer rests between attacks</small></button>
+        <button type="button" data-pace="hard">Hard pace<small>shorter rests, tighter gaps</small></button>
+      </div>
+    </div>
     <progress id="progress" aria-label="Loading progress"></progress>
     <p id="status" role="status">Loading…</p>
     <noscript>Enable JavaScript to play.</noscript>
   </div>
   <script src="index.js"></script>
   <script>
-    // The demo is one fixed floor 4 (seed 1), so it always needs the same lighting shaders.
+    // The demo is the Nameless Regent's fight (floor 6's guardian) and nothing else (Risx, 2026-11-28), at either
+    // pace (Risx: "Keep both for now"). The hall is fixed, so it always needs the same lighting shaders.
     const SEED = 1;
-    const config = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":2214172,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
-    config.args = ['--', '--solo', '--district=2', '--new-art', '--class=sworn', '--hd-quality=web', '--demo-floor4', `--seed=${SEED}`, ...new URLSearchParams(location.search).getAll('arg')];
+    const params = new URLSearchParams(location.search);
+    const config = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":2437116,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+    const gameArgs = (pace) => ['--', '--solo', '--boss=nameless_regent', '--class=sworn', '--new-art', '--hd-quality=web',
+      '--demo-regent', `--seed=${SEED}`, ...(pace === 'hard' ? ['--regent-pace=hard'] : []), ...params.getAll('arg')];
     const canvas = document.getElementById('canvas');
     const cover = document.getElementById('cover');
     const status = document.getElementById('status');
     const progress = document.getElementById('progress');
     const ended = document.getElementById('ended');
+    const paceBox = document.getElementById('pace');
+    const paceAsk = document.getElementById('pace-ask');
 
-    // The shader pack (shaders.json): the exact lighting shaders this floor needs, captured from the game
-    // (make-pack.mjs). On a first visit a browser takes 20-40 s to build each big one, and the game builds them
-    // one at a time (about 3.5 minutes on Chrome for Windows). The page hands the browser all of them at once,
-    // so it builds them side by side on several cores (about a minute); when the game asks for them they are
-    // already built. Same shaders, so the same look. A browser without parallel building, or a page without
-    // the pack, loads as it always did.
+    // The shader pack (shaders.json): the slowest lighting shaders this fight needs, captured from the game
+    // (../tools/README.md). On a first visit a browser takes seconds to build each, and the game builds them one at
+    // a time. The page hands Chrome all of them at once, so it builds them side by side on several cores; when the
+    // game asks for them they are already built. Same shaders, so the same look. A browser without parallel
+    // building (Firefox), or a page without the pack, loads as it always did.
     const load = { mb: 0, mbTotal: 0, shaders: 0, shadersTotal: 0 };
     // Once the game reports its own progress (hcLoading), the page stops writing over it.
     let heard = false;
     const tell = () => {
       if (heard) return;
-      if (load.shadersTotal) {
+      if (load.shadersTotal && load.shaders < load.shadersTotal) {
         progress.max = load.shadersTotal; progress.value = load.shaders;
         status.textContent = `Preparing the lighting… ${load.shaders} of ${load.shadersTotal}`;
-      } else if (load.mbTotal) {
+      } else if (load.mbTotal && load.mb < load.mbTotal) {
         progress.max = load.mbTotal; progress.value = load.mb;
         status.textContent = `Loading… ${Math.round(load.mb / 1e6)} of ${Math.round(load.mbTotal / 1e6)} MB`;
       }
@@ -97,8 +118,7 @@
       });
       load.shadersTotal = programs.length;
       // Wait for each in turn while the rest keep building. Asking whether a shader linked while it is still
-      // building is what files it in the browser's saved shader cache (asking only once it was done, or
-      // polling COMPLETION_STATUS, left it out), so a later visit loads it from disk in moments.
+      // building is what files it in the browser's saved shader cache, so a later visit loads it from disk.
       // The page holds still while it waits.
       for (const program of programs) {
         await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
@@ -110,18 +130,52 @@
       return `${programs.length} shaders ready`;
     }
 
+    // The pace: picked on the cover (or ?pace=hard / ?pace=normal in the address). The game starts once a pace is
+    // picked and the download is done. Changing pace later reloads the page with the other one.
+    let pickPace;
+    const paceChosen = new Promise((resolve) => { pickPace = resolve; });
+    let pace = null;
+    for (const button of paceBox.querySelectorAll('button')) {
+      button.addEventListener('click', () => {
+        if (pace === null) {
+          pace = button.dataset.pace;
+          button.setAttribute('aria-pressed', 'true');
+          paceBox.hidden = true;
+          pickPace(pace);
+        } else if (button.dataset.pace !== pace) {
+          // From the end screen: the other pace, in a fresh page.
+          location.search = `?pace=${button.dataset.pace}`;
+        } else {
+          ended.hidden = true;
+          paceBox.hidden = true;
+        }
+      });
+    }
+    if (params.get('pace') === 'hard' || params.get('pace') === 'normal') {
+      pace = params.get('pace');
+      paceBox.hidden = true;
+      pickPace(pace);
+    }
+
     if (typeof Engine === 'undefined') {
       status.textContent = 'The game could not load. Reload the page to try again.';
       progress.hidden = true;
+      paceBox.hidden = true;
     } else if (Engine.getMissingFeatures({ threads: false }).length) {
       status.textContent = 'This game needs a browser with WebGL 2 and WebAssembly.';
       progress.hidden = true;
+      paceBox.hidden = true;
     } else {
-      // The game says how its own load is going (HdStage: it builds the floor a part at a time, then prepares
-      // the lighting one view a frame) and when it is ready; the cover stays up until then.
-      const show = () => { cover.hidden = true; ended.hidden = true; canvas.focus(); };
-      // The demo is floor 4 only: its exit brings the cover back with a thank-you, and floor 4 starts again under it.
-      window.hcDemoEnd = () => { ended.hidden = false; cover.hidden = false; status.textContent = ''; progress.removeAttribute('value'); };
+      // The game says how its own load is going (HdStage: it builds the hall, then prepares the lighting) and when
+      // it is ready; the cover stays up until then.
+      const show = () => { cover.hidden = true; ended.hidden = true; paceBox.hidden = true; canvas.focus(); };
+      // The demo ends at the hall's exit after his defeat: the cover comes back with a thank-you and the fight
+      // starts again at the same pace under it; the other pace is one click away.
+      window.hcDemoEnd = () => {
+        ended.hidden = false; cover.hidden = false; status.textContent = 'The fight starts again…'; progress.removeAttribute('value');
+        paceAsk.textContent = 'Or try the other pace:';
+        paceBox.hidden = false;
+      };
       window.hcLoading = (label, done, total) => {
         heard = true;
         progress.max = Math.max(total, 1);
@@ -133,22 +187,23 @@
       const warm = warmShaders(`shaders.json?seed=${SEED}`).then((result) => {
         console.log(`shader pack: ${result} after ${Math.round(performance.now() - t0)} ms`);
       });
-      // What engine.startGame() does, with the shader building added alongside.
+      // What engine.startGame() does, with the shader building and the pace choice added alongside.
       const exe = config.executable;
       const pack = config.mainPack || `${exe}.pck`;
-      config.args = ['--main-pack', pack].concat(config.args);
       const engine = new Engine({
         ...config,
         onProgress(current, total) {
           if (total > 0) { load.mb = current; load.mbTotal = total; tell(); }
         },
       });
-      // The download and the shader building run side by side; the game starts when both are done, so its
-      // own lighting step finds every shader built.
       Promise.all([engine.init(exe), engine.preloadFile(pack, pack), warm]).then(() => {
-        status.textContent = 'Starting…';
+        if (pace === null) status.textContent = 'Ready when you are.';
         progress.removeAttribute('value');
-        return engine.start();
+        return paceChosen;
+      }).then((chosen) => {
+        status.textContent = 'Starting…';
+        console.log(`pace: ${chosen}`);
+        return engine.start({ args: ['--main-pack', pack].concat(gameArgs(chosen)) });
       }).then(() => {
         // The game may already be reporting its own progress by now; don't write over it.
         if (!heard) {
@@ -161,6 +216,7 @@
       }).catch((error) => {
         console.error(error);
         progress.hidden = true;
+        paceBox.hidden = true;
         status.textContent = 'The game could not start. Reload the page to try again.';
       });
     }
